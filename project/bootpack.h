@@ -110,7 +110,6 @@ struct KEYBUF {
 	int next_r, next_w, len;
 };
 
-void init_pic(void);
 #define PIC0_ICW1		0x0020
 #define PIC0_OCW2		0x0020
 #define PIC0_IMR		0x0021
@@ -124,3 +123,20 @@ void init_pic(void);
 #define PIC1_ICW3		0x00a1
 #define PIC1_ICW4		0x00a1
 #define	PORT_KEYDAT		0x0060
+void init_pic(void);
+
+/* fifo.c*/
+struct FIFO8 {
+	unsigned char *buf;		//缓冲区的起始指针
+	int p;					//下一个写入地址next_w
+	int q;					//下一个读出地址next_r
+	int size;				//缓冲区的总字节数
+	int free;				//缓冲区没有数据的字节数
+	int flags;				//是否充满缓冲区的标志
+};
+
+#define FLAGS_OVERRUN	0x0001
+void fifo8_init(struct FIFO8 *fifo, int size, unsigned char *buf);
+int fifo8_put(struct FIFO8 *fifo, unsigned char data);
+int fifo8_get(struct FIFO8 *fifo);
+int fifo8_status(struct FIFO8 *fifo);

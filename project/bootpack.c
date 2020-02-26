@@ -2,7 +2,12 @@
 #include<stdio.h>
 #include "bootpack.h"
 
-extern struct KEYBUF keybuf;
+//extern struct KEYBUF keybuf;
+extern struct FIFO8 keyfifo;
+extern struct FIFO8 mousefifo;
+
+void init_keyboard(void);
+void enable_mouse(void);
 
 void HariMain(void)
 {
@@ -17,7 +22,7 @@ void HariMain(void)
 	//int *binfo_vram;						//这是个指针，指针的内容也是个指针，内容指针表示*vram
 	
 	struct BOOTINFO *info = (struct BOOTINFO *) 0x0ff0;
-	char s[40];
+	char s[40], keybuf[32], mousebuf[128];
 	int mx, my, i;
 	char mcursor[256];
 	
@@ -25,6 +30,14 @@ void HariMain(void)
 	init_gdtidt();
 	init_pic();
 	io_sti();
+	
+	fifo8_init(&keyfifo, 32, keybuf);
+	fifo8_init(&mousefifo, 128, mousebuf);
+	
+	io_out8(PIC0_IMR, 0xf9);
+	io_out8(PIC1_IMR, 0xef);
+	
+	init_keyboard();
 	
 	init_palette();				//设定调色板
 	
@@ -53,25 +66,32 @@ void HariMain(void)
 	init_mouse_cursor8(mcursor, COL8_008484);
 	putblock8_8(info -> vram, info -> scrnx, 16, 16, mx, my, mcursor, 16);
 	
-	io_out8(PIC0_IMR, 0xf9);
-	io_out8(PIC1_IMR, 0xef);
-	
+	enable_mouse();
 	
 	for(;;) {
 		io_cli();
-		if(keybuf.len == 0) {
+		if(fifo8_status(&keyfifo) + fifo8_status(&mousefifo) == 0) {
 			io_stihlt();
 		} else {
-			i = keybuf.data[keybuf.next_r];
-			keybuf.len--;
-			keybuf.next_r++;
-			if(keybuf.next_r == 32) {
-				keybuf.next_r = 0;
+			//i = keybuf.data[keybuf.next_r];
+			//keybuf.len--;
+			//keybuf.next_r++;
+			//if(keybuf.next_r == 32) {
+			//	keybuf.next_r = 0;
+			//}
+			if(fifo8_status(&keyfifo) != 0) {
+				i = fifo8_get(&keyfifo);
+				io_sti();
+				sprintf(s, "%02X", i);
+				boxfill8(info -> vram, info -> scrnx, COL8_008484, 0, 16, 15, 31);
+				putfont8_asc(info -> vram, info -> scrnx, 0, 16, COL8_FFFFFF, s);
+			} else if (fifo8_status(&mousefifo) != 0) {
+				i = fifo8_get(&mousefifo);
+				io_sti();
+				sprintf(s, "%02X", i);
+				boxfill8(info -> vram, info -> scrnx, COL8_008484, 32, 16, 47, 31);
+				putfont8_asc(info -> vram, info -> scrnx, 32, 16, COL8_FFFFFF, s);
 			}
-			io_sti();
-			sprintf(s, "%02X", i);
-			boxfill8(info -> vram, info -> scrnx, COL8_008484, 0, 16, 15, 31);
-			putfont8_asc(info -> vram, info -> scrnx, 0, 16, COL8_FFFFFF, s);
 		}
 	}
 	
@@ -102,3 +122,44 @@ void HariMain(void)
 	}
 }
 
+
+#define	PORT_KEYDAT				0x0060
+#define	PORT_KEYSTA				0x0064
+#define	PORT_KEYCMD				0x0064
+#define	KEYSTA_SEND_NOTREADY	0x02
+#define	KEYCMD_WRITE_MODE		0x60
+#define	KBC_MODE				0x47
+
+void wait_KBC_sendready(void)
+{
+	//等待键盘控制电路准备完毕
+	for(;;) {
+		if((io_in8(PORT_KEYSTA) & KEYSTA_SEND_NOTREADY) == 0) {
+			break;
+		}
+	}
+	return;
+}
+
+void init_keyboard(void)
+{
+	//初始化键盘控制电路
+	wait_KBC_sendready();
+	io_out8(PORT_KEYCMD, KEYCMD_WRITE_MODE);
+	wait_KBC_sendready();
+	io_out8(PORT_KEYDAT, KBC_MODE);
+	return;
+}
+
+#define	KEYCMD_SENDTO_MOUSE		0xd4
+#define	MOUSECMD_ENABLE			0xf4
+
+void enable_mouse(void)
+{
+	//激活鼠标
+	wait_KBC_sendready();
+	io_out8(PORT_KEYCMD, KEYCMD_SENDTO_MOUSE);
+	wait_KBC_sendready();
+	io_out8(PORT_KEYDAT, MOUSECMD_ENABLE);
+	return;		//顺利的话，键盘控制器会返回ACK(0xfa)
+}
