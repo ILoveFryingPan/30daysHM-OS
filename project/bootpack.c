@@ -6,8 +6,14 @@
 extern struct FIFO8 keyfifo;
 extern struct FIFO8 mousefifo;
 
+struct MOUSE_DEC {
+	unsigned char buf[3], phase;
+	int x, y, btn;
+};
+
 void init_keyboard(void);
-void enable_mouse(void);
+void enable_mouse(struct MOUSE_DEC *mdec);
+int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat);
 
 void HariMain(void)
 {
@@ -25,17 +31,19 @@ void HariMain(void)
 	char s[40], keybuf[32], mousebuf[128];
 	int mx, my, i;
 	char mcursor[256];
+	struct MOUSE_DEC mdec;
+	
 	
 	//初始化“段”和中断以及pic,并且设置sti,使CPU能够接收外部设备的中断
 	init_gdtidt();
 	init_pic();
-	io_sti();
+	io_sti();			//IDT/PIC的初始化已经完成， 于是开放CPU的中断
 	
 	fifo8_init(&keyfifo, 32, keybuf);
 	fifo8_init(&mousefifo, 128, mousebuf);
 	
-	io_out8(PIC0_IMR, 0xf9);
-	io_out8(PIC1_IMR, 0xef);
+	io_out8(PIC0_IMR, 0xf9);		//开放PIC1和键盘中断（11111001）
+	io_out8(PIC1_IMR, 0xef);		//开放鼠标中断（11101111）
 	
 	init_keyboard();
 	
@@ -66,7 +74,7 @@ void HariMain(void)
 	init_mouse_cursor8(mcursor, COL8_008484);
 	putblock8_8(info -> vram, info -> scrnx, 16, 16, mx, my, mcursor, 16);
 	
-	enable_mouse();
+	enable_mouse(&mdec);
 	
 	for(;;) {
 		io_cli();
@@ -88,9 +96,43 @@ void HariMain(void)
 			} else if (fifo8_status(&mousefifo) != 0) {
 				i = fifo8_get(&mousefifo);
 				io_sti();
-				sprintf(s, "%02X", i);
-				boxfill8(info -> vram, info -> scrnx, COL8_008484, 32, 16, 47, 31);
-				putfont8_asc(info -> vram, info -> scrnx, 32, 16, COL8_FFFFFF, s);
+				if(mouse_decode(&mdec, i) != 0) {
+					//鼠标的三个字节都齐了，显示出来
+					sprintf(s, "%02X %02X %02X", mdec.buf[0], mdec.buf[1], mdec.buf[2]);
+					boxfill8(info -> vram, info -> scrnx, COL8_008484, 32, 16, 32 + 26 * 8 - 1, 31);
+					putfont8_asc(info -> vram, info -> scrnx, 32, 16, COL8_FFFFFF, s);
+					
+					sprintf(s, "[lcr %4d %4d]", mdec.x, mdec.y);
+					if((mdec.btn & 0x01) != 0) {
+						s[1] = 'L';
+					}
+					if((mdec.btn & 0x02) != 0) {
+						s[3] = 'R';
+					}
+					if((mdec.btn & 0x04) != 0) {
+						s[2] = 'C';
+					}
+					putfont8_asc(info -> vram, info -> scrnx, 112, 16, COL8_FFFFFF, s);
+					boxfill8(info -> vram, info -> scrnx, COL8_008484, mx, my, mx + 15, my + 15);	//隐藏鼠标
+					mx += mdec.x;
+					my += mdec.y;
+					if(mx < 0) {
+						mx = 0;
+					}
+					if(my < 0) {
+						my = 0;
+					}
+					if(mx > info -> scrnx - 16) {
+						mx = info -> scrnx - 16;
+					}
+					if(my > info -> scrny - 16) {
+						my = info -> scrny - 16;
+					}
+					sprintf(s, "(%3d, %3d)", mx, my);
+					boxfill8(info -> vram, info -> scrnx, COL8_008484, 0, 0, 79, 15);		//隐藏坐标
+					putfont8_asc(info -> vram, info -> scrnx, 0, 0, COL8_FFFFFF, s);		//显示坐标
+					putblock8_8(info -> vram, info -> scrnx, 16, 16, mx, my, mcursor, 16);	//描画鼠标
+				}
 			}
 		}
 	}
@@ -154,12 +196,51 @@ void init_keyboard(void)
 #define	KEYCMD_SENDTO_MOUSE		0xd4
 #define	MOUSECMD_ENABLE			0xf4
 
-void enable_mouse(void)
+void enable_mouse(struct MOUSE_DEC *mdec)
 {
 	//激活鼠标
 	wait_KBC_sendready();
 	io_out8(PORT_KEYCMD, KEYCMD_SENDTO_MOUSE);
 	wait_KBC_sendready();
 	io_out8(PORT_KEYDAT, MOUSECMD_ENABLE);
+	mdec -> phase = 0;
 	return;		//顺利的话，键盘控制器会返回ACK(0xfa)
+}
+
+int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat)
+{
+	if(0 == mdec -> phase) {
+		if(0xfa == dat) {		//等待鼠标的0xfa的状态
+			mdec -> phase = 1;
+		}
+		return 0;
+	}
+	if(1 == mdec -> phase) {
+		if((dat & 0xc8) == 0x08) {	//因为第一个字节高四位的值为0~3，低八位的值为8,9,a,c,通过if判断，如果为true，则满足条件
+			mdec -> buf[0] = dat;		//等待鼠标的第一个字节
+			mdec -> phase = 2;
+		}
+		return 0;
+	}
+	if(2 == mdec -> phase) {
+		mdec -> buf[1] = dat;		//等待鼠标的第二个字节
+		mdec -> phase = 3;
+		return 0;
+	}
+	if(3 == mdec -> phase) {
+		mdec -> buf[2] = dat;		//等待鼠标的第三个字节
+		mdec -> phase = 1;
+		mdec -> btn = mdec -> buf[0] & 0x07;	//经过与运算后，btn可能值为1,2,4，分别代表左点击，又点击，滚轮点击
+		mdec -> x = mdec -> buf[1];
+		mdec -> y = mdec -> buf[2];
+		if((mdec -> buf[0] & 0x10) != 0) {
+			mdec -> x |= 0xffffff00;
+		}
+		if((mdec -> buf[0] & 0x20) != 0) {
+			mdec -> y |= 0xffffff00;
+		}
+		mdec -> y = -mdec -> y;					//鼠标的y方向与画面符号相反
+		return 1;
+	}
+	return -1;
 }
