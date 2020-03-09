@@ -17,6 +17,8 @@
 	GLOBAL	_load_gdtr, _load_idtr
 	GLOBAL	_asm_inthandler21, _asm_inthandler27
 	GLOBAL	_asm_inthandler2c
+	GLOBAL	_load_cr0, _store_cr0
+	GLOBAL	_memtest_sub
 	
 	EXTERN	_inthandler21, _inthandler27
 	EXTERN	_inthandler2c
@@ -153,4 +155,47 @@ _asm_inthandler2c:
 		POP		DS
 		POP		ES
 		IRETD
+		
+_load_cr0:			; int load_cr0(void);
+		MOV		EAX, CR0
+		RET
+		
+_store_cr0:			; void store_cr0(int cr0);
+		MOV		EAX, [ESP+4]
+		MOV		CR0, EAX
+		RET
+		
+_memtest_sub:		; unsigned int memtest_sub(unsigned int start, unsigned int end)
+		PUSH	EDI
+		PUSH	ESI
+		PUSH	EBX			;由于还要使用EBX， ESI， EDI
+		MOV		ESI, 0XAA55AA55		; pat0 = 0xaa55aa55
+		MOV		EDI, 0X55AA55AA		; pat1 = 0x55aa55aa
+		MOV		EAX, [ESP+12+4]		; i = start
+mts_loop:
+		MOV		EBX, EAX
+		ADD		EBX, 0XFFC			; P = i + 0xffc
+		MOV		EDX, [EBX]			; old = *p;
+		MOV		[EBX], ESI			; *P = pat0
+		XOR		DWORD [EBX], 0XFFFFFFFF		; *p ^= 0xffffffff
+		CMP		EDI, [EBX]
+		JNE		mts_fin				; if ( *p != pat1 ) goto fin
+		XOR		DWORD [EBX], 0XFFFFFFFF		; *p ^= 0xffffffff
+		CMP		ESI, [EBX]
+		JNE		mts_fin				; if (*p != pat0) goto fin
+		MOV		[EBX], EDX			; *p = old;
+		ADD		EAX, 0X1000			; i += 0x1000;
+		CMP		EAX, [ESP+12+8]		; if ( i <= end) goto mts_loop
+		
+		JBE		mts_loop
+		POP		EBX
+		POP		ESI
+		POP		EDI
+		RET
+mts_fin:
+		MOV		[EBX], EDX			; *p = old
+		POP		EBX
+		POP		ESI
+		POP		EDI
+		RET
 		

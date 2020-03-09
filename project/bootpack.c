@@ -6,14 +6,8 @@
 extern struct FIFO8 keyfifo;
 extern struct FIFO8 mousefifo;
 
-struct MOUSE_DEC {
-	unsigned char buf[3], phase;
-	int x, y, btn;
-};
+unsigned int memtest(unsigned int start, unsigned int end);
 
-void init_keyboard(void);
-void enable_mouse(struct MOUSE_DEC *mdec);
-int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat);
 
 void HariMain(void)
 {
@@ -75,6 +69,10 @@ void HariMain(void)
 	putblock8_8(info -> vram, info -> scrnx, 16, 16, mx, my, mcursor, 16);
 	
 	enable_mouse(&mdec);
+	
+	i = memtest(0x00400000, 0xbfffffff) / (1024 * 1024);
+	sprintf(s, "memory %dMB", i);
+	putfont8_asc(info -> vram, info -> scrnx, 0, 48, COL8_FFFFFF, s);
 	
 	for(;;) {
 		io_cli();
@@ -165,82 +163,41 @@ void HariMain(void)
 }
 
 
-#define	PORT_KEYDAT				0x0060
-#define	PORT_KEYSTA				0x0064
-#define	PORT_KEYCMD				0x0064
-#define	KEYSTA_SEND_NOTREADY	0x02
-#define	KEYCMD_WRITE_MODE		0x60
-#define	KBC_MODE				0x47
+#define EFLAGS_AC_BIT		0x00040000
+#define CR0_CACHE_DISABLE	0x60000000
 
-void wait_KBC_sendready(void)
+unsigned int memtest(unsigned int start, unsigned int end)
 {
-	//等待键盘控制电路准备完毕
-	for(;;) {
-		if((io_in8(PORT_KEYSTA) & KEYSTA_SEND_NOTREADY) == 0) {
-			break;
-		}
+	char flg486 = 0;
+	unsigned int eflg, cr0, i;
+	
+	//确认CPU是386还是486以上的
+	eflg = io_load_eflags();
+	eflg |= EFLAGS_AC_BIT;;		//AC-bit = 1
+	io_store_eflags(eflg);
+	eflg = io_load_eflags();
+	//上面的四行代码：先取出标志，使之变为1，然后将标志设置回去，再次取出该标志
+	//如果该标志是1就表示CPU是486，因为386会自动把设置的标志变为0
+	if((eflg & EFLAGS_AC_BIT) != 0) {
+		//如果是386，即使设定AC=1， AC的值还会自动回到0
+		flg486 = 1;
 	}
-	return;
-}
-
-void init_keyboard(void)
-{
-	//初始化键盘控制电路
-	wait_KBC_sendready();
-	io_out8(PORT_KEYCMD, KEYCMD_WRITE_MODE);
-	wait_KBC_sendready();
-	io_out8(PORT_KEYDAT, KBC_MODE);
-	return;
-}
-
-#define	KEYCMD_SENDTO_MOUSE		0xd4
-#define	MOUSECMD_ENABLE			0xf4
-
-void enable_mouse(struct MOUSE_DEC *mdec)
-{
-	//激活鼠标
-	wait_KBC_sendready();
-	io_out8(PORT_KEYCMD, KEYCMD_SENDTO_MOUSE);
-	wait_KBC_sendready();
-	io_out8(PORT_KEYDAT, MOUSECMD_ENABLE);
-	mdec -> phase = 0;
-	return;		//顺利的话，键盘控制器会返回ACK(0xfa)
-}
-
-int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat)
-{
-	if(0 == mdec -> phase) {
-		if(0xfa == dat) {		//等待鼠标的0xfa的状态
-			mdec -> phase = 1;
-		}
-		return 0;
+	eflg &= ~EFLAGS_AC_BIT;		//AC-bit = 0
+	io_store_eflags(eflg);		//上面的只是判断CPU是哪种，所以判断完了就将标志复位
+	
+	if(flg486 != 0) {
+		cr0 = load_cr0();
+		cr0 |= CR0_CACHE_DISABLE;	//禁止缓存
+		store_cr0(cr0);
 	}
-	if(1 == mdec -> phase) {
-		if((dat & 0xc8) == 0x08) {	//因为第一个字节高四位的值为0~3，低八位的值为8,9,a,c,通过if判断，如果为true，则满足条件
-			mdec -> buf[0] = dat;		//等待鼠标的第一个字节
-			mdec -> phase = 2;
-		}
-		return 0;
+	
+	i = memtest_sub(start, end);
+	
+	if(flg486 != 0) {
+		cr0 = load_cr0();
+		cr0 &= ~CR0_CACHE_DISABLE;	//允许缓存
+		store_cr0(cr0);
 	}
-	if(2 == mdec -> phase) {
-		mdec -> buf[1] = dat;		//等待鼠标的第二个字节
-		mdec -> phase = 3;
-		return 0;
-	}
-	if(3 == mdec -> phase) {
-		mdec -> buf[2] = dat;		//等待鼠标的第三个字节
-		mdec -> phase = 1;
-		mdec -> btn = mdec -> buf[0] & 0x07;	//经过与运算后，btn可能值为1,2,4，分别代表左点击，又点击，滚轮点击
-		mdec -> x = mdec -> buf[1];
-		mdec -> y = mdec -> buf[2];
-		if((mdec -> buf[0] & 0x10) != 0) {
-			mdec -> x |= 0xffffff00;
-		}
-		if((mdec -> buf[0] & 0x20) != 0) {
-			mdec -> y |= 0xffffff00;
-		}
-		mdec -> y = -mdec -> y;					//鼠标的y方向与画面符号相反
-		return 1;
-	}
-	return -1;
+	
+	return i;
 }
