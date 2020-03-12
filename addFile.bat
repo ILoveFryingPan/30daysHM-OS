@@ -1,1 +1,1 @@
-"D:\Program Files\Git\bin\git.exe" add .\
+"D:\Program Files\Git\bin\git.exe" add .\project\
