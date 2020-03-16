@@ -166,3 +166,44 @@ struct MOUSE_DEC {
 void enable_mouse(struct MOUSE_DEC *mdec);
 int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat);
 
+
+/* memory.c */
+#define EFLAGS_AC_BIT		0x00040000
+#define CR0_CACHE_DISABLE	0x60000000
+#define MEMMAN_FREES		4090		//大约是32KB
+#define MEMMEN_ADDR			0x003c0000
+
+struct FREEINFO {
+	//可用信息
+	unsigned int addr, size;
+};
+
+struct MEMMAN {
+	//内存管理
+	int frees, maxfrees, lostsize, losts;
+	struct FREEINFO free [MEMMAN_FREES];
+};
+
+unsigned int memtest(unsigned int start, unsigned int end);
+int memman_free(struct MEMMAN *man, unsigned int addr, unsigned int size);
+unsigned int memman_alloc(struct MEMMAN *man, unsigned int size);
+unsigned int memman_total(struct MEMMAN *man);
+void memman_init(struct MEMMAN *man);
+unsigned int memman_alloc_4k(struct MEMMAN *man, unsigned int size);
+int memman_free_4k(struct MEMMAN *man, unsigned int addr, unsigned int size);
+
+
+/* sheet.c */
+#define MAX_SHEETS		256
+
+struct SHEET {
+	unsigned char *buf;
+	int bxsize, bysize, vx0, vy0, col_inv, height, flags;
+};
+
+struct SHTCTL {
+	unsigned char *vram;
+	int xsize, ysize, top;
+	struct SHEET *sheets[MAX_SHEETS];
+	struct SHEET sheets0[MAX_SHEETS];
+};
