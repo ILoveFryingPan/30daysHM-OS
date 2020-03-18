@@ -207,3 +207,18 @@ struct SHTCTL {
 	struct SHEET *sheets[MAX_SHEETS];
 	struct SHEET sheets0[MAX_SHEETS];
 };
+
+//初始化图层结构体
+struct SHTCTL *shtctl_init(struct MEMMAN *memman, unsigned char *vram, int xsize, int ysize);
+//创建一个新的图层
+struct SHEET *sheet_alloc(struct SHTCTL *ctl);
+//设置图层的基本数据
+void sheet_setbuf(struct SHEET *sht, unsigned char *buf, int xsize, int ysize, int col_inv);
+//调整图层的高度
+void sheet_updown(struct SHTCTL *ctl, struct SHEET *sht, int height);
+//刷新所有的图层
+void sheet_refresh(struct SHTCTL *ctl);
+//上下左右移动图层
+void sheet_slide(struct SHTCTL *ctl, struct SHEET *sht, int vx0, int vy0);
+//释放已使用图层的内存的函数
+void sheet_free(struct SHTCTL *ctl, struct SHEET *sht);
