@@ -217,8 +217,10 @@ void sheet_setbuf(struct SHEET *sht, unsigned char *buf, int xsize, int ysize, i
 //调整图层的高度
 void sheet_updown(struct SHTCTL *ctl, struct SHEET *sht, int height);
 //刷新所有的图层
-void sheet_refresh(struct SHTCTL *ctl);
+void sheet_refresh(struct SHTCTL *ctl, struct SHEET *sht, int bx0, int by0, int bx1, int by1);
 //上下左右移动图层
 void sheet_slide(struct SHTCTL *ctl, struct SHEET *sht, int vx0, int vy0);
 //释放已使用图层的内存的函数
 void sheet_free(struct SHTCTL *ctl, struct SHEET *sht);
+//在限制范围内刷新界面
+void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1);
