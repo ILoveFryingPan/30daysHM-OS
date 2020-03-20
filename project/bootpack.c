@@ -60,18 +60,18 @@ void HariMain(void)
 	sheet_setbuf(sht_mouse, buf_mouse, 16, 16, 99);				//透明色号99
 	init_screen(buf_back, info -> scrnx, info -> scrny);	//向背景图层描述数组里面写入要显示的数据
 	init_mouse_cursor8(buf_mouse, 99);						//背景色号99，向鼠标描述数组写数据
-	sheet_slide(shtctl, sht_back, 0, 0);				//设置背景图层的显示位置，因为高度是-1，所以还没绘制
+	sheet_slide(sht_back, 0, 0);				//设置背景图层的显示位置，因为高度是-1，所以还没绘制
 	mx = (info -> scrnx - 16) / 2;
 	my = (info -> scrny - 28 -16) / 2;
-	sheet_slide(shtctl, sht_mouse, mx, my);		//设置鼠标图层显示的位置
-	sheet_updown(shtctl, sht_back, 0);		//设置背景图层的高度，因为高度大于等于0，所以绘制
-	sheet_updown(shtctl, sht_mouse, 1);
+	sheet_slide(sht_mouse, mx, my);		//设置鼠标图层显示的位置
+	sheet_updown(sht_back, 0);		//设置背景图层的高度，因为高度大于等于0，所以绘制
+	sheet_updown(sht_mouse, 1);
 	//显示mx和my的值
 	sprintf(s, "(%d, %d)", mx, my);
 	putfont8_asc(buf_back, (*info).scrnx, 0, 0, COL8_FFFFFF, s);
 	sprintf(s, "memory %dMB    free : %dKB", memtotal / (1024 * 1024), memman_total(memman) / 1024);
 	putfont8_asc(buf_back, info -> scrnx, 0, 32, COL8_FFFFFF, s);
-	sheet_refresh(shtctl, sht_back, 0, 0, info -> scrnx, 48);
+	sheet_refresh(sht_back, 0, 0, info -> scrnx, 48);
 	
 	
 	for(;;) {
@@ -91,7 +91,7 @@ void HariMain(void)
 				sprintf(s, "%02X", i);
 				boxfill8(buf_back, info -> scrnx, COL8_008484, 0, 16, 15, 31);
 				putfont8_asc(buf_back, info -> scrnx, 0, 16, COL8_FFFFFF, s);
-				sheet_refresh(shtctl, sht_back, 0, 16, 16, 32);
+				sheet_refresh(sht_back, 0, 16, 16, 32);
 			} else if (fifo8_status(&mousefifo) != 0) {
 				i = fifo8_get(&mousefifo);
 				io_sti();
@@ -110,7 +110,7 @@ void HariMain(void)
 					}
 					boxfill8(buf_back, info -> scrnx, COL8_008484, 32, 16, 32 + 15 * 8 -1, 31);
 					putfont8_asc(buf_back, info -> scrnx, 32, 16, COL8_FFFFFF, s);
-					sheet_refresh(shtctl, sht_back, 32, 16, 32 + 15 * 8, 32);
+					sheet_refresh(sht_back, 32, 16, 32 + 15 * 8, 32);
 					//移动光标
 					mx += mdec.x;
 					my += mdec.y;
@@ -129,8 +129,8 @@ void HariMain(void)
 					sprintf(s, "(%3d, %3d)", mx, my);
 					boxfill8(buf_back, info -> scrnx, COL8_008484, 0, 0, 79, 15);		//隐藏坐标
 					putfont8_asc(buf_back, info -> scrnx, 0, 0, COL8_FFFFFF, s);		//显示坐标
-					sheet_refresh(shtctl, buf_back, 0, 0, 80, 16);
-					sheet_slide(shtctl, sht_mouse, mx, my);	//包含sheet_refresh
+					sheet_refresh(buf_back, 0, 0, 80, 16);
+					sheet_slide(sht_mouse, mx, my);	//包含sheet_refresh
 				}
 			}
 		}

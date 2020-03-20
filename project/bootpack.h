@@ -199,6 +199,7 @@ int memman_free_4k(struct MEMMAN *man, unsigned int addr, unsigned int size);
 struct SHEET {
 	unsigned char *buf;
 	int bxsize, bysize, vx0, vy0, col_inv, height, flags;
+	struct SHTCTL *ctl;
 };
 
 struct SHTCTL {
@@ -215,12 +216,12 @@ struct SHEET *sheet_alloc(struct SHTCTL *ctl);
 //设置图层的基本数据
 void sheet_setbuf(struct SHEET *sht, unsigned char *buf, int xsize, int ysize, int col_inv);
 //调整图层的高度
-void sheet_updown(struct SHTCTL *ctl, struct SHEET *sht, int height);
+void sheet_updown(struct SHEET *sht, int height);
 //刷新所有的图层
-void sheet_refresh(struct SHTCTL *ctl, struct SHEET *sht, int bx0, int by0, int bx1, int by1);
+void sheet_refresh(struct SHEET *sht, int bx0, int by0, int bx1, int by1);
 //上下左右移动图层
-void sheet_slide(struct SHTCTL *ctl, struct SHEET *sht, int vx0, int vy0);
+void sheet_slide(struct SHEET *sht, int vx0, int vy0);
 //释放已使用图层的内存的函数
-void sheet_free(struct SHTCTL *ctl, struct SHEET *sht);
+void sheet_free(struct SHEET *sht);
 //在限制范围内刷新界面
 void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1);

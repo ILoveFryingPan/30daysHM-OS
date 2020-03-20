@@ -17,6 +17,7 @@ struct SHTCTL *shtctl_init(struct MEMMAN *memman, unsigned char *vram, int xsize
 	ctl -> top = -1;	//一个SHEET都没有
 	for(i = 0; i < MAX_SHEETS; i++) {
 		ctl -> sheets0[i].flags = 0;	//标记为未使用
+		ctl -> sheets0[i].ctl = ctl;
 	}
 	
 err:
@@ -52,8 +53,9 @@ void sheet_setbuf(struct SHEET *sht, unsigned char *buf, int xsize, int ysize, i
 }
 
 //调整图层的高度
-void sheet_updown(struct SHTCTL *ctl, struct SHEET *sht, int height)
+void sheet_updown(struct SHEET *sht, int height)
 {
+	struct SHTCTL *ctl = sht -> ctl;
 	int h;		//循环控制变量
 	int old = sht -> height;	//存储设置前的高度信息
 	
@@ -84,7 +86,7 @@ void sheet_updown(struct SHTCTL *ctl, struct SHEET *sht, int height)
 			}
 			ctl -> top--;	//由于显示中的图层减少了一个，所以最上面的图层高度下降
 		}
-		sheet_refresh(ctl, ctl -> sheets[height], 0, 0, ctl -> xsize, ctl -> ysize);		//按新图层的信息重新绘制画面
+		sheet_refresh(sht, sht -> vx0, sht -> vy0, sht -> bxsize, sht -> bysize);		//按新图层的信息重新绘制画面
 	} else if(old < height) {	//比以前高
 		if(old >= 0) {
 			//把中间的拉下去
@@ -102,16 +104,16 @@ void sheet_updown(struct SHTCTL *ctl, struct SHEET *sht, int height)
 			ctl -> sheets[height] = sht;
 			ctl -> top++;		//由于已显示的图层增加了1个，所以最上面的图层高度增加
 		}
-		sheet_refresh(ctl, ctl -> sheets[height], 0, 0, ctl -> xsize, ctl -> ysize);		//按新图层信息重新绘制画面
+		sheet_refresh(sht, sht -> vx0, sht -> vy0, sht -> bxsize, sht -> bysize);		//按新图层信息重新绘制画面
 	}
 	return;
 }	
 
 //刷新所有的图层
-void sheet_refresh(struct SHTCTL *ctl, struct SHEET *sht, int bx0, int by0, int bx1, int by1)
+void sheet_refresh(struct SHEET *sht, int bx0, int by0, int bx1, int by1)
 {
 	if(sht -> height >= 0) {	//如果正在显示，则按新图层的信息刷新画面
-		sheet_refreshsub(ctl, sht -> vx0 + bx0, sht -> vy0 + by0, sht -> vx0 + bx1, sht -> vy0 + by1);
+		sheet_refreshsub(sht -> ctl, sht -> vx0 + bx0, sht -> vy0 + by0, sht -> vx0 + bx1, sht -> vy0 + by1);
 	}
 	return;
 }
@@ -169,24 +171,24 @@ void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1)
 }
 
 //上下左右移动图层
-void sheet_slide(struct SHTCTL *ctl, struct SHEET *sht, int vx0, int vy0)
+void sheet_slide(struct SHEET *sht, int vx0, int vy0)
 {
 	int old_vx0 = sht -> vx0, old_vy0 = sht -> vy0;
 	sht -> vx0 = vx0;
 	sht -> vy0 = vy0;
 	if(sht -> height >= 0) {	//如果正在显示
 		//sheet_refresh(ctl);		//按新图层的信息刷新画面
-		sheet_refreshsub(ctl, old_vx0, old_vy0, old_vx0 + sht -> bxsize, old_vy0 + sht -> bysize);
-		sheet_refreshsub(ctl, vx0, vy0, vx0 + sht -> bxsize, vy0 + sht -> bysize);
+		sheet_refreshsub(sht -> ctl, old_vx0, old_vy0, old_vx0 + sht -> bxsize, old_vy0 + sht -> bysize);
+		sheet_refreshsub(sht -> ctl, vx0, vy0, vx0 + sht -> bxsize, vy0 + sht -> bysize);
 	}
 	return;
 }
 
 //释放已使用图层的内存的函数
-void sheet_free(struct SHTCTL *ctl, struct SHEET *sht)
+void sheet_free(struct SHEET *sht)
 {
 	if(sht -> height >= 0) {
-		sheet_updown(ctl, sht, -1);		//如果处于显示状态，则先设定为隐藏
+		sheet_updown(sht, -1);		//如果处于显示状态，则先设定为隐藏
 	}
 	sht -> flags = 0;		//未使用标志
 	return;
