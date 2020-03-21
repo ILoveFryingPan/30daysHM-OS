@@ -163,4 +163,30 @@ void HariMain(void)
 	for(;;) {
 		io_hlt();
 	}
+	
 }
+
+//窗口的图层缓冲区的创建
+void make_window8(unsigned char *buf, int xsize, int ysize, char *title)
+{
+	static char closebtn[14][16] = {
+		"000000000000000@",
+		"0QQQQQQQQQQQQQ$@",
+		"0QQQQQQQQQQQQQ$@",
+		"0QQQ@@QQQQ@@QQ$@",
+		"0QQQQ@@QQ@@QQQ$@",
+		"0QQQQQ@@@@QQQQ$@",
+		"0QQQQQQ@@QQQQQ$@",
+		"0QQQQQ@@@@QQQQ$@",
+		"0QQQQ@@QQ@@QQQ$@",
+		"0QQQ@@QQQQ@@QQ$@",
+		"0QQQQQQQQQQQQQ$@",
+		"0QQQQQQQQQQQQQ$@",
+		"0$$$$$$$$$$$$$$@",
+		"@@@@@@@@@@@@@@@@"
+	};
+	
+	int x, y;
+	char c;
+	boxfill8(buf, xsize, COL8_C6C6C6, 0,		0,		xsize - 1,0		);
+	boxfill8(buf, xsize

@@ -1,1 +1,0 @@
-"D:\Program Files\Git\bin\git.exe" add .\project\
