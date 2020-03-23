@@ -76,6 +76,7 @@ void sheet_updown(struct SHEET *sht, int height)
 				ctl -> sheets[h] -> height = h;
 			}
 			ctl -> sheets[height] = sht;
+			sheet_refreshsub(ctl, sht -> vx0, sht -> vy0, sht -> bxsize, sht -> bysize, height + 1);
 		} else {	//隐藏
 			if(ctl -> top > old) {
 				//把上面的降下来
@@ -85,8 +86,9 @@ void sheet_updown(struct SHEET *sht, int height)
 				}
 			}
 			ctl -> top--;	//由于显示中的图层减少了一个，所以最上面的图层高度下降
+			sheet_refreshsub(ctl, sht -> vx0, sht -> vy0, sht -> bxsize, sht -> bysize, 0);
 		}
-		sheet_refresh(sht, sht -> vx0, sht -> vy0, sht -> bxsize, sht -> bysize);		//按新图层的信息重新绘制画面
+		//sheet_refresh(sht, sht -> vx0, sht -> vy0, sht -> bxsize, sht -> bysize);		//按新图层的信息重新绘制画面
 	} else if(old < height) {	//比以前高
 		if(old >= 0) {
 			//把中间的拉下去
@@ -104,7 +106,7 @@ void sheet_updown(struct SHEET *sht, int height)
 			ctl -> sheets[height] = sht;
 			ctl -> top++;		//由于已显示的图层增加了1个，所以最上面的图层高度增加
 		}
-		sheet_refresh(sht, sht -> vx0, sht -> vy0, sht -> bxsize, sht -> bysize);		//按新图层信息重新绘制画面
+		sheet_refreshsub(ctl, sht -> vx0, sht -> vy0, sht -> bxsize, sht -> bysize, height);		//按新图层信息重新绘制画面
 	}
 	return;
 }	
@@ -113,13 +115,14 @@ void sheet_updown(struct SHEET *sht, int height)
 void sheet_refresh(struct SHEET *sht, int bx0, int by0, int bx1, int by1)
 {
 	if(sht -> height >= 0) {	//如果正在显示，则按新图层的信息刷新画面
-		sheet_refreshsub(sht -> ctl, sht -> vx0 + bx0, sht -> vy0 + by0, sht -> vx0 + bx1, sht -> vy0 + by1);
+		sheet_refreshsub(sht -> ctl, sht -> vx0 + bx0, sht -> vy0 + by0, 
+		sht -> vx0 + bx1, sht -> vy0 + by1, sht -> height);
 	}
 	return;
 }
 
 //图层在一定范围内刷新
-void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1)
+void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0)
 {
 	int h, bx, by, vx, vy, bx0, by0, bx1, by1;
 	unsigned char *buf, c, *vram = ctl -> vram;
@@ -136,7 +139,7 @@ void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1)
 	if(vy1 > ctl -> ysize) {
 		vy1 = ctl -> ysize;
 	}
-	for(h = 0; h <= ctl -> top; h++) {
+	for(h = h0; h <= ctl -> top; h++) {
 		sht = ctl -> sheets[h];
 		buf = sht -> buf;
 		//使用vx0~vy1, 对bx0~by1进行倒推
@@ -178,8 +181,8 @@ void sheet_slide(struct SHEET *sht, int vx0, int vy0)
 	sht -> vy0 = vy0;
 	if(sht -> height >= 0) {	//如果正在显示
 		//sheet_refresh(ctl);		//按新图层的信息刷新画面
-		sheet_refreshsub(sht -> ctl, old_vx0, old_vy0, old_vx0 + sht -> bxsize, old_vy0 + sht -> bysize);
-		sheet_refreshsub(sht -> ctl, vx0, vy0, vx0 + sht -> bxsize, vy0 + sht -> bysize);
+		sheet_refreshsub(sht -> ctl, old_vx0, old_vy0, old_vx0 + sht -> bxsize, old_vy0 + sht -> bysize, 0);
+		sheet_refreshsub(sht -> ctl, vx0, vy0, vx0 + sht -> bxsize, vy0 + sht -> bysize, sht -> height);
 	}
 	return;
 }

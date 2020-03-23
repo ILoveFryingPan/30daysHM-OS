@@ -224,4 +224,4 @@ void sheet_slide(struct SHEET *sht, int vx0, int vy0);
 //释放已使用图层的内存的函数
 void sheet_free(struct SHEET *sht);
 //在限制范围内刷新界面
-void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1);
+void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0);
