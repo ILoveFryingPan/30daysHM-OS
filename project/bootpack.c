@@ -6,6 +6,9 @@
 extern struct FIFO8 keyfifo;
 extern struct FIFO8 mousefifo;
 
+//窗口的图层缓冲区的创建
+void make_window8(unsigned char *buf, int xsize, int ysize, char *title);
+
 void HariMain(void)
 {
 	//int i;			/*变量声明：i是一个32位整数*/
@@ -23,11 +26,11 @@ void HariMain(void)
 	int mx, my, i;
 	char mcursor[256];
 	struct MOUSE_DEC mdec;
-	unsigned int memtotal;
+	unsigned int memtotal, count = 0;
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMEN_ADDR;
 	struct SHTCTL *shtctl;
-	struct SHEET *sht_back, *sht_mouse;
-	unsigned char *buf_back, buf_mouse[256];
+	struct SHEET *sht_back, *sht_mouse, *sht_win;;
+	unsigned char *buf_back, buf_mouse[256], *buf_win;
 	
 	
 	//初始化“段”和中断以及pic,并且设置sti,使CPU能够接收外部设备的中断
@@ -55,29 +58,46 @@ void HariMain(void)
 	shtctl = shtctl_init(memman, info -> vram, info -> scrnx, info -> scrny);
 	sht_back = sheet_alloc(shtctl);
 	sht_mouse = sheet_alloc(shtctl);
+	sht_win = sheet_alloc(shtctl);
 	buf_back = (unsigned char *) memman_alloc_4k(memman, info -> scrnx * info -> scrny);
+	buf_win = (unsigned char *) memman_alloc_4k(memman, 160 * 52);
 	sheet_setbuf(sht_back, buf_back, info -> scrnx, info -> scrny, -1);		//没有透明色
 	sheet_setbuf(sht_mouse, buf_mouse, 16, 16, 99);				//透明色号99
+	sheet_setbuf(sht_win, buf_win, 160, 52, -1);
 	init_screen(buf_back, info -> scrnx, info -> scrny);	//向背景图层描述数组里面写入要显示的数据
 	init_mouse_cursor8(buf_mouse, 99);						//背景色号99，向鼠标描述数组写数据
+	make_window8(buf_win, 160, 52, "counter");
+	//putfont8_asc(buf_win, 160, 24, 28, COL8_000000, "Welcome to");
+	//putfont8_asc(buf_win, 160, 24, 44, COL8_000000, "   Haribote_os!");
 	sheet_slide(sht_back, 0, 0);				//设置背景图层的显示位置，因为高度是-1，所以还没绘制
 	mx = (info -> scrnx - 16) / 2;
 	my = (info -> scrny - 28 -16) / 2;
 	sheet_slide(sht_mouse, mx, my);		//设置鼠标图层显示的位置
+	sheet_slide(sht_win, 80, 72);
 	sheet_updown(sht_back, 0);		//设置背景图层的高度，因为高度大于等于0，所以绘制
-	sheet_updown(sht_mouse, 1);
+	sheet_updown(sht_win, 1);
+	sheet_updown(sht_mouse, 2);
 	//显示mx和my的值
 	sprintf(s, "(%d, %d)", mx, my);
 	putfont8_asc(buf_back, (*info).scrnx, 0, 0, COL8_FFFFFF, s);
 	sprintf(s, "memory %dMB    free : %dKB", memtotal / (1024 * 1024), memman_total(memman) / 1024);
 	putfont8_asc(buf_back, info -> scrnx, 0, 32, COL8_FFFFFF, s);
-	sheet_refresh(sht_back, 0, 0, info -> scrnx, 48);
+	//sheet_refresh(sht_back, 0, 0, info -> scrnx, 48);
+	sheet_refresh(sht_back, 0, 0, info -> scrnx, info -> scrny);
 	
 	
 	for(;;) {
+		count++;
+		sprintf(s, "%010d", count);
+		boxfill8(buf_win, 160, COL8_C6C6C6, 40, 28, 119, 43);
+		putfont8_asc(buf_win, 160, 40, 28, COL8_000000, s);
+		
+		sheet_refresh(sht_win, 40, 28, 120, 44);
+		
 		io_cli();
 		if(fifo8_status(&keyfifo) + fifo8_status(&mousefifo) == 0) {
-			io_stihlt();
+			//io_stihlt();
+			io_sti();
 		} else {
 			//i = keybuf.data[keybuf.next_r];
 			//keybuf.len--;
@@ -189,4 +209,31 @@ void make_window8(unsigned char *buf, int xsize, int ysize, char *title)
 	int x, y;
 	char c;
 	boxfill8(buf, xsize, COL8_C6C6C6, 0,		0,		xsize - 1,0		);
-	boxfill8(buf, xsize
+	boxfill8(buf, xsize, COL8_FFFFFF, 1,		1,		xsize - 2,1		);
+	boxfill8(buf, xsize, COL8_C6C6C6, 0,		0,		0,			ysize - 1);
+	boxfill8(buf, xsize, COL8_FFFFFF, 1,		1,		1,			ysize - 2);
+	boxfill8(buf, xsize, COL8_848484, xsize - 2,1,		xsize - 2,ysize - 2);
+	boxfill8(buf, xsize, COL8_000000, xsize - 1,0,		xsize - 1,ysize - 1);
+	boxfill8(buf, xsize, COL8_C6C6C6, 2,		2,		xsize - 3,ysize - 3);
+	boxfill8(buf, xsize, COL8_000084, 3,		3,		xsize - 4,20		);
+	boxfill8(buf, xsize, COL8_848484, 1,		ysize - 2,xsize - 2,ysize - 2);
+	boxfill8(buf, xsize, COL8_000000, 0,		ysize - 1,xsize - 1,ysize - 1);
+	putfont8_asc(buf, xsize, 24, 4, COL8_FFFFFF, title);
+	
+	for(y = 0; y < 14; y++) {
+		for(x = 0; x < 16; x++) {
+			c = closebtn[y][x];
+			if(c == '@') {
+				c = COL8_000000;
+			} else if(c == '$') {
+				c = COL8_848484;
+			} else if(c == 'Q') {
+				c = COL8_C6C6C6;
+			} else {
+				c = COL8_FFFFFF;
+			}
+			buf[(5 + y) * xsize + (xsize - 21 + x)] = c;
+		}
+	}
+	return;
+}
