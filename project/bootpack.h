@@ -203,7 +203,7 @@ struct SHEET {
 };
 
 struct SHTCTL {
-	unsigned char *vram;
+	unsigned char *vram, *map;
 	int xsize, ysize, top;
 	struct SHEET *sheets[MAX_SHEETS];
 	struct SHEET sheets0[MAX_SHEETS];
@@ -224,4 +224,6 @@ void sheet_slide(struct SHEET *sht, int vx0, int vy0);
 //释放已使用图层的内存的函数
 void sheet_free(struct SHEET *sht);
 //在限制范围内刷新界面
-void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0);
+void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1);
+//用于标记界面中的每一个像素都是属于哪一个图层的
+void sheet_refreshmap(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0);
